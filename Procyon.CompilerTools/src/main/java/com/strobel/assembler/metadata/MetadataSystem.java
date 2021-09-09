@@ -127,7 +127,7 @@ public class MetadataSystem extends MetadataResolver {
         }
 
         final TypeDefinition typeDefinition = ClassFileReader.readClass(
-            _isEagerMethodLoadingEnabled ? ClassFileReader.OPTIONS_DEFAULT | ClassFileReader.OPTION_PROCESS_CODE
+            !_isEagerMethodLoadingEnabled ? ClassFileReader.OPTIONS_DEFAULT | ClassFileReader.OPTION_PROCESS_CODE
                                          : ClassFileReader.OPTIONS_DEFAULT,
             this,
             buffer

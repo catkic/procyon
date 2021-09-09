@@ -766,7 +766,11 @@ public final class ConstantPool extends Freezable implements Iterable<ConstantPo
         }
 
         public String getName() {
-            return ((Utf8StringConstantEntry) owner.get(nameIndex, Tag.Utf8StringConstant)).value;
+            String name = ((Utf8StringConstantEntry) owner.get(nameIndex, Tag.Utf8StringConstant)).value;
+            if ("org/jeecg/common/util/jsonschema/a".equals(name)) {
+                return "org/jeecg/common/util/jsonschema/BaseColumn";
+            }
+            return name;
         }
 
         @Override

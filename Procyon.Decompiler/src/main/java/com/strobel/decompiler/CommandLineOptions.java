@@ -20,6 +20,7 @@ import com.beust.jcommander.Parameter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 
 public class CommandLineOptions {
     @Parameter(description = "<type names or class/jar files>")
@@ -57,7 +58,7 @@ public class CommandLineOptions {
     @Parameter(
         names = { "-ec", "--retain-explicit-casts" },
         description = "Do not remove redundant explicit casts.")
-    private boolean _retainRedundantCasts;
+    private boolean _retainRedundantCasts=false;
 
     @Parameter(
         names = { "-fsb", "--flatten-switch-blocks" },
@@ -143,7 +144,7 @@ public class CommandLineOptions {
         names = { "-ll", "--log-level" },
         description = "Set the level of log verbosity (0-3).  Level 0 disables logging.",
         arity = 1)
-    private int _logLevel;
+    private int _logLevel = Level.FINE.intValue();
 
     @Parameter(
         names = { "-lc", "--light" },
@@ -153,7 +154,7 @@ public class CommandLineOptions {
     @Parameter(
         names = { "--unicode" },
         description = "Enable Unicode output (printable non-ASCII characters will not be escaped).")
-    private boolean _isUnicodeOutputEnabled;
+    private boolean _isUnicodeOutputEnabled = true;
 
     @Parameter(
         names = { "-eml", "--eager-method-loading" },

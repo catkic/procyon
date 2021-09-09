@@ -117,7 +117,8 @@ public class DeclareVariablesTransform implements IAstTransform {
 
                 if (parent instanceof ExpressionStatement) {
                     if (analysisResult.isSingleAssignment) {
-                        declaration.addModifier(Modifier.FINAL);
+                        // 这里加上了final
+//                        declaration.addModifier(Modifier.FINAL);
                     }
 
                     declaration.putUserDataIfAbsent(Keys.MEMBER_REFERENCE, parent.getUserData(Keys.MEMBER_REFERENCE));
@@ -126,7 +127,7 @@ public class DeclareVariablesTransform implements IAstTransform {
                 }
                 else {
                     if (analysisResult.isSingleAssignment) {
-                        declaration.addModifier(Modifier.FINAL);
+//                        declaration.addModifier(Modifier.FINAL);
                     }
 
                     replacedAssignment.replaceWith(declaration);

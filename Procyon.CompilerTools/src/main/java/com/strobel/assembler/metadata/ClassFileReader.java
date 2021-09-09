@@ -54,7 +54,7 @@ public final class ClassFileReader extends MetadataReader {
     private final List<FieldInfo> _fields;
     private final List<MethodInfo> _methods;
     private final List<SourceAttribute> _attributes;
-    private final String _internalName;
+    private String _internalName;
 
     private final TypeDefinition _typeDefinition;
     private final MetadataParser _parser;
@@ -100,6 +100,7 @@ public final class ClassFileReader extends MetadataReader {
         else {
             _typeDefinition.setPackageName(_internalName.substring(0, delimiter).replace('/', '.'));
             _typeDefinition.setName(_internalName.substring(delimiter + 1));
+
         }
 
         _attributes = _typeDefinition.getSourceAttributesInternal();
@@ -112,6 +113,7 @@ public final class ClassFileReader extends MetadataReader {
         else {
             _typeDefinition.setPackageName(_internalName.substring(0, delimiterIndex).replace('/', '.'));
             _typeDefinition.setName(_internalName.substring(delimiterIndex + 1));
+
         }
 
         _resolverFrame.addType(_typeDefinition);
@@ -436,6 +438,7 @@ public final class ClassFileReader extends MetadataReader {
                 try {
                     populateDeclaringType();
                     populateBaseTypes();
+                    // 里面访问annotation
                     visitAttributes();
                     visitFields();
                     defineMethods();

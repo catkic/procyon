@@ -56,7 +56,9 @@ public class JavaLanguage extends Language {
 
     @Override
     public TypeDecompilationResults decompileType(final TypeDefinition type, final ITextOutput output, final DecompilationOptions options) {
+        // 建立ast树
         final AstBuilder astBuilder = buildAst(type, options);
+        // 生成代码
         final List<LineNumberPosition> lineNumberPositions = astBuilder.generateCode(output);
 
         return new TypeDecompilationResults(lineNumberPositions);
@@ -68,6 +70,7 @@ public class JavaLanguage extends Language {
 
     private AstBuilder buildAst(final TypeDefinition type, final DecompilationOptions options) {
         final AstBuilder builder = createAstBuilder(options, type, false);
+        // add type 应该是增加package declaration
         builder.addType(type);
         runTransforms(builder, options, null);
         return builder;
