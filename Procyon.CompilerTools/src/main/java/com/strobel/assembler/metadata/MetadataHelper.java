@@ -754,6 +754,10 @@ public final class MetadataHelper {
         else if (baseType.isGenericType()) {
             baseArguments = ((IGenericInstance) baseType).getTypeArguments();
         }
+        else if (baseType instanceof RawType && baseType.getUnderlyingType().hasGenericParameters()) {
+            baseArguments = baseType.getUnderlyingType().getGenericParameters();
+
+        }
         else {
             baseArguments = Collections.emptyList();
         }
@@ -777,6 +781,27 @@ public final class MetadataHelper {
 
                         for (int i = 0; i < typeArguments.size(); i++) {
                             map.put(typeArguments.get(i), baseArguments.get(i));
+                        }
+
+                        return map;
+                    }
+                }
+                else if (current instanceof IGenericInstance
+                         && baseType instanceof RawType
+                         && baseType.getUnderlyingType().hasGenericParameters()) {
+                    final List<? extends TypeReference> typeArguments = ((IGenericInstance) current).getTypeArguments();
+
+                    if (baseArguments.size() == typeArguments.size()) {
+                        final Map<TypeReference, TypeReference> map = new HashMap<>();
+
+                        for (int i = 0; i < typeArguments.size(); i++) {
+                            if (isSubType(typeArguments.get(i), getSuperType(typeArguments.get(i)))) {
+                                map.put(baseArguments.get(i), getSuperType(typeArguments.get(i)));
+                            }
+                            else {
+                                map.put(baseArguments.get(i), typeArguments.get(i));
+
+                            }
                         }
 
                         return map;

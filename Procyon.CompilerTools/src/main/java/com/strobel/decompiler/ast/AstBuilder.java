@@ -109,6 +109,7 @@ public final class AstBuilder {
 
         LOG.fine("Creating bytecode AST...");
 
+        // 好像是bytecode 转 ast 了
         @SuppressWarnings("UnnecessaryLocalVariable")
         final List<Node> ast = builder.convertToAst(
             byteCode,
@@ -3672,6 +3673,7 @@ public final class AstBuilder {
         }
 
         if (tailStartIndex < endIndex.getValue()) {
+            // 这里convert了
             ast.addAll(convertToAst(body.subList(tailStartIndex, endIndex.getValue())));
         }
         else {
@@ -3749,6 +3751,7 @@ public final class AstBuilder {
         //
         for (final ByteCode byteCode : body) {
             final Instruction originalInstruction = mappedInstruction(_originalInstructionMap, byteCode.instruction);
+            // 这个getEndOffset 是根据指令的size来的
             final Range codeRange = new Range(originalInstruction.getOffset(), originalInstruction.getEndOffset());
 
             if (byteCode.stackBefore == null /*|| _removed.contains(byteCode.instruction)*/) {

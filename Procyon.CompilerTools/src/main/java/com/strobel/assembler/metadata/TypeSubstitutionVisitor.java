@@ -279,7 +279,7 @@ public final class TypeSubstitutionVisitor extends DefaultTypeVisitor<Map<TypeRe
         final List<ParameterDefinition> newParameters = visitParameters(oldParameters, map);
 
         if (newTypeArguments != oldTypeArguments ||
-            newReturnType != oldReturnType ||
+            (newReturnType != oldReturnType) ||
             newParameters != oldParameters) {
 
             return new GenericMethodInstance(

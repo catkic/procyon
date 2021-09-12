@@ -53,7 +53,7 @@ public class CommandLineOptions {
     @Parameter(
         names = { "-eta", "--explicit-type-arguments" },
         description = "Always print type arguments to generic methods.")
-    private boolean _forceExplicitTypeArguments;
+    private boolean _forceExplicitTypeArguments=true;
 
     @Parameter(
         names = { "-ec", "--retain-explicit-casts" },
@@ -93,7 +93,7 @@ public class CommandLineOptions {
     @Parameter(
         names = { "-ta", "--type-attributes" },
         description = "Includes type attributes when displaying raw bytecode (unnecessary with -v).")
-    private boolean _showTypeAttributes;
+    private boolean _showTypeAttributes=true;
 
     @Parameter(
         names = { "-v", "--verbose" },
@@ -144,7 +144,9 @@ public class CommandLineOptions {
         names = { "-ll", "--log-level" },
         description = "Set the level of log verbosity (0-3).  Level 0 disables logging.",
         arity = 1)
-    private int _logLevel = Level.FINE.intValue();
+    private int _logLevel  ;
+//= Level.FINE.intValue()
+
 
     @Parameter(
         names = { "-lc", "--light" },
@@ -186,7 +188,7 @@ public class CommandLineOptions {
         names = { "--suppress-banner" },
         description = "Do not display the 'Decompiled by Procyon' banner in output.",
         hidden = true)
-    private boolean _suppressBanner;
+    private boolean _suppressBanner=true;
 
     public final List<String> getInputs() {
         return _inputs;

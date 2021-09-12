@@ -217,6 +217,7 @@ public class AstMethodBodyBuilder {
         final Set<Variable> methodParameters = new LinkedHashSet<>();
         final Set<Variable> localVariables = new LinkedHashSet<>();
 
+        // 这里开始根据bytecode建立不知道什么的表达式
         final List<com.strobel.decompiler.ast.Expression> expressions = method.getSelfAndChildrenRecursive(
             com.strobel.decompiler.ast.Expression.class
         );

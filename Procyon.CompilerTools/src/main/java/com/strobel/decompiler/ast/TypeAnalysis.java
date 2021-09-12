@@ -485,7 +485,6 @@ public final class TypeAnalysis {
 
                 for (final ExpressionToInfer e : expressionsToInfer) {
                     final List<Expression> arguments = e.expression.getArguments();
-
                     assert e.expression.getCode().isStore() && arguments.size() == 1 ||
                            e.expression.getCode() == AstCode.Inc ||
                            e.expression.getCode() == AstCode.PreIncrement ||
@@ -568,12 +567,10 @@ public final class TypeAnalysis {
                             if (_stack.contains(c)) {
                                 continue;
                             }
-
                             c.setExpectedType(null);
 
                             if ((matchLoad(c, variable) || matchStore(c, variable)) &&
                                 !MetadataHelper.isSameType(c.getInferredType(), inferredType)) {
-
                                 c.setExpectedType(inferredType);
                             }
 
@@ -2418,7 +2415,186 @@ public final class TypeAnalysis {
                     );
                 }
             }
+
+            if ("java/lang/invoke/LambdaMetafactory".equals(bootstrapMethod.getDeclaringType().getInternalName()) &&
+                StringUtilities.equals("altMetafactory", bootstrapMethod.getName(), StringComparison.OrdinalIgnoreCase) &&
+                callSite.getBootstrapArguments().size() == 5 &&
+                callSite.getBootstrapArguments().get(1) instanceof MethodHandle) {
+
+                final MethodHandle targetHandle = (MethodHandle) callSite.getBootstrapArguments().get(1);
+                final MethodReference targetMethod = targetHandle.getMethod();
+                final Map<TypeReference, TypeReference> expectedMappings = new HashMap<>();
+                final Map<TypeReference, TypeReference> inferredMappings = new HashMap<>();
+
+                MethodReference functionMethod = null;
+
+                final TypeDefinition resolvedType = result.resolve();
+
+                final List<MethodReference> methods = MetadataHelper.findMethods(
+                    resolvedType != null ? resolvedType : result,
+                    MetadataFilters.matchName(callSite.getMethodName())
+                );
+
+                for (final MethodReference m : methods) {
+                    final MethodDefinition r = m.resolve();
+
+                    if (r != null && r.isAbstract() && !r.isStatic() && !r.isDefault()) {
+                        functionMethod = r;
+                        break;
+                    }
+                }
+
+                if (functionMethod == null) {
+                    return null;
+                }
+
+                boolean firstArgIsTarget = false;
+                MethodReference actualMethod = targetMethod;
+
+                switch (targetHandle.getHandleType()) {
+                    case GetField:
+                    case PutField:
+                    case InvokeVirtual:
+                    case InvokeSpecial:
+                    case InvokeInterface: {
+                        if (arguments.size() > 0) {
+                            final Expression arg = arguments.get(0);
+                            final TypeReference expectedArgType = targetMethod.getDeclaringType();
+
+                            if (forceInferChildren) {
+                                inferTypeForExpression(arg, expectedArgType, true);
+                            }
+
+                            final TypeReference targetType = arg.getInferredType();
+
+                            if (targetType != null &&
+                                MetadataHelper.isSubType(targetType, expectedArgType)) {
+
+                                firstArgIsTarget = true;
+
+                                final MethodReference asMember = MetadataHelper.asMemberOf(actualMethod, targetType);
+
+                                if (asMember != null) {
+                                    actualMethod = asMember;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (expectedType != null && expectedType.isGenericType() && !expectedType.isGenericDefinition()) {
+                    final List<GenericParameter> genericParameters;
+
+                    if (resolvedType != null) {
+                        genericParameters = resolvedType.getGenericParameters();
+                    }
+                    else {
+                        genericParameters = expectedType.getGenericParameters();
+                    }
+
+                    final List<TypeReference> typeArguments = ((IGenericInstance) expectedType).getTypeArguments();
+
+                    if (typeArguments.size() == genericParameters.size()) {
+                        for (int i = 0; i < genericParameters.size(); i++) {
+                            final TypeReference typeArgument = typeArguments.get(i);
+                            final GenericParameter genericParameter = genericParameters.get(i);
+
+                            if (!MetadataHelper.isSameType(typeArgument, genericParameter, true)) {
+                                expectedMappings.put(genericParameter, typeArgument);
+                            }
+                        }
+                    }
+                }
+
+                new AddMappingsForArgumentVisitor(
+                    actualMethod.isConstructor() ? actualMethod.getDeclaringType()
+                                                 : actualMethod.getReturnType()
+                ).visit(resolvedType.getGenericParameters().get(1), inferredMappings);
+
+                new AddMappingsForArgumentVisitor(actualMethod.getDeclaringType()).visit(
+                    resolvedType.getGenericParameters().get(0),
+                    inferredMappings
+                );
+                final List<ParameterDefinition> tp = actualMethod.getParameters();
+                final List<ParameterDefinition> fp = functionMethod.getParameters();
+
+                if (tp.size() == fp.size()) {
+                    for (int i = 0; i < fp.size(); i++) {
+                        new AddMappingsForArgumentVisitor(tp.get(i).getParameterType()).visit(fp.get(i).getParameterType(), inferredMappings);
+                    }
+                }
+
+                for (final TypeReference key : expectedMappings.keySet()) {
+                    final TypeReference expectedMapping = expectedMappings.get(key);
+                    final TypeReference inferredMapping = inferredMappings.get(key);
+
+                    if (inferredMapping == null || MetadataHelper.isSubType(expectedMapping, inferredMapping)) {
+                        inferredMappings.put(key, expectedMapping);
+                    }
+                }
+
+                result = TypeSubstitutionVisitor.instance().visit(
+                    resolvedType != null ? resolvedType : result,
+                    inferredMappings
+                );
+
+                if (!firstArgIsTarget || expectedType == null) {
+                    return result;
+                }
+
+                //
+                // If we have a target argument, see if we can improve its inferred type based on our result function type.
+                // For example, if our target method is Set<E>::add(E), and our function type is Function<String, Boolean>, then
+                // we should be able to infer that E is bound to String, and our target type is actually Set<String>.
+                //
+
+                TypeReference declaringType = actualMethod.getDeclaringType();
+
+                if (!declaringType.isGenericDefinition() && !MetadataHelper.isRawType(actualMethod.getDeclaringType())) {
+//                    return result;
+                }
+
+                declaringType = declaringType.isGenericDefinition() ? declaringType : declaringType.resolve();
+
+                if (declaringType == null) {
+//                    return result;
+                }
+
+                final MethodReference resultMethod = MetadataHelper.asMemberOf(functionMethod, result);
+
+                actualMethod = actualMethod.resolve();
+
+                if (resultMethod == null || actualMethod == null) {
+//                    return result;
+                }
+
+                inferredMappings.clear();
+
+                new AddMappingsForArgumentVisitor(resultMethod.getReturnType()).visit(actualMethod.getReturnType(), inferredMappings);
+                new AddMappingsForArgumentVisitor(resultMethod.getParameters().get(0).getParameterType()).visit(declaringType, inferredMappings);
+
+                final List<ParameterDefinition> ap = actualMethod.getParameters();
+                final List<ParameterDefinition> rp = resultMethod.getParameters();
+
+                if (ap.size() == rp.size()) {
+                    for (int i = 0, n = ap.size(); i < n; i++) {
+                        new AddMappingsForArgumentVisitor(rp.get(i).getParameterType()).visit(ap.get(i).getParameterType(), inferredMappings);
+                    }
+                }
+
+                final TypeReference resolvedTargetType = TypeSubstitutionVisitor.instance().visit(declaringType, inferredMappings);
+                return resolvedTargetType;
+//                if (resolvedTargetType != null) {
+//                    inferTypeForExpression(
+//                        arguments.get(0),
+//                        resolvedTargetType,
+//                        true
+//                    );
+//                }
+            }
         }
+
+
 
         return result;
     }
@@ -2440,7 +2616,7 @@ public final class TypeAnalysis {
             MethodReference actualMethod;
 
             if (hasThis) {
-                final Expression thisArg = arguments.get(0);
+                final Expression thisArg = arguments.get(0); // 第零个一般都是调用t
 
                 final TypeReference expectedTargetType = thisArg.getInferredType() != null ? thisArg.getInferredType()
                                                                                            : thisArg.getExpectedType();
@@ -2460,6 +2636,7 @@ public final class TypeAnalysis {
                     targetType = method.getDeclaringType();
                 }
                 else {
+                    // 推断调用者的类型
                     targetType = inferTypeForExpression(
                         arguments.get(0),
                         method.getDeclaringType()
@@ -2494,25 +2671,37 @@ public final class TypeAnalysis {
 
             Map<TypeReference, TypeReference> mappings = null;
 
+            // 包含有泛型的方法会进这个
             if (actualMethod.containsGenericParameters() || r != null && r.containsGenericParameters()) {
                 final Map<TypeReference, TypeReference> oldMappings = new HashMap<>();
                 final Map<TypeReference, TypeReference> newMappings = new HashMap<>();
                 final Map<TypeReference, TypeReference> inferredMappings = new HashMap<>();
 
-                if (targetType != null && targetType.isGenericType()) {
+                if (targetType != null && targetType.isGenericType() ) {
                     oldMappings.putAll(MetadataHelper.getGenericSubTypeMappings(targetType.getUnderlyingType(), targetType));
                 }
+
+                if (targetType != null && targetType.getUnderlyingType()!=null) {
+                    oldMappings.putAll(MetadataHelper.getGenericSubTypeMappings(targetType, actualMethod.getDeclaringType()));
+                }
+
+
 
                 final List<ParameterDefinition> rp = r != null ? r.getParameters() : actualMethod.getParameters();
                 final List<ParameterDefinition> cp = boundMethod.getParameters();
 
                 final boolean mapOld = method instanceof IGenericInstance;
 
+                // 只推断第一个泛型后面的就不推了
+
+                int size = parameters.size() > 1 ? parameters.size() - 1 : parameters.size();
                 for (int i = 0; i < parameters.size(); i++) {
                     final TypeReference rType = rp.get(i).getParameterType();
                     final TypeReference pType = p.get(i).getParameterType();
                     final TypeReference cType = cp.get(i).getParameterType();
-                    final TypeReference aType = inferTypeForExpression(arguments.get(hasThis ? i + 1 : i), cType/*null*/);
+                    final TypeReference aType = inferTypeForExpression(arguments.get(hasThis ? i + 1 : i), null/*null*/); // 这里推断所有用到这个类型的地方 有个地方没有推断出来都不能写这个type
+//
+                    // 现在的思路是发现之前有赋值的类型推断，后面就不覆盖了
 
                     if (mapOld && rType != null && rType.containsGenericParameters()) {
                         new AddMappingsForArgumentVisitor(pType).visit(rType, oldMappings);
@@ -2559,6 +2748,9 @@ public final class TypeAnalysis {
                         if (oldMapping == null || MetadataHelper.isSubType(newMapping, oldMapping)) {
                             mappings.put(t, newMapping);
                         }
+                        ;
+                        mappings.putAll(MetadataHelper.getGenericSubTypeMappings(oldMapping, newMapping));
+
                     }
                 }
 
@@ -3178,6 +3370,7 @@ public final class TypeAnalysis {
                         mappedType = MetadataHelper.erase(mappedType);
                     }
                 }
+                // 不把他放进去就行了，上一个就传不进来
                 map.put(t, mappedType);
             }
             else if (MetadataHelper.isSubType(argumentType, existingMapping)) {
